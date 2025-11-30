@@ -11,13 +11,7 @@ CORS(app)
 
 # Utility function to parse CTC strings
 def parse_ctc(ctc_str):
-    """
-    Convert strings like '₹ 3,00,000 - 4,60,000 /year' into a numeric float.
-    Only uses the first occurrence in case of duplication.
-    1. Extract the first '₹ x - y' format using regex.
-    2. Remove '₹', commas, and other non-numeric characters.
-    3. Take average if it's a range.
-    """
+   
     if not isinstance(ctc_str, str):
         return None
 
@@ -38,7 +32,7 @@ def parse_ctc(ctc_str):
         return None
     return nums[0] if len(nums) == 1 else sum(nums) / len(nums)
 
-# Load dataset
+
 csv_rel_path = os.path.join(os.path.dirname(__file__), 'static/data/filtered_dataset.csv')
 csv_alt_path = 'filtered_dataset.csv'
 
@@ -49,17 +43,13 @@ elif os.path.exists(csv_alt_path):
 else:
     abort(500, description='Dataset CSV file not found.')
 
-# Ensure numeric CTC
 if 'ctc' in df.columns and not pd.api.types.is_numeric_dtype(df['ctc']):
     df['ctc'] = df['ctc'].apply(parse_ctc)
     df['ctc'] = pd.to_numeric(df['ctc'], errors='coerce')
     df.dropna(subset=['ctc'], inplace=True)
 
-# Normalize location column
 df['location'] = df['location'].apply(lambda x: x.split(',')[0].strip() if isinstance(x, str) else x)
 
-
-# Precompute aggregations
 skill_avg_ctc_dict = df.groupby('skill_required')['ctc'].mean().to_dict()
 skill_counts_dict = df['skill_required'].value_counts().to_dict()
 location_counts_dict = df['location'].value_counts().to_dict()
@@ -69,8 +59,6 @@ box_data_skill = {skill: group['ctc'].tolist() for skill, group in df.groupby('s
 box_data_location = {loc: group['ctc'].tolist() for loc, group in df.groupby('location')}
 skill_avg_sorted_dict = dict(df.groupby('skill_required')['ctc'].mean().sort_values())
 
-
-# count distinct companies per skill
 skill_company_counts_dict = (
     df.groupby('skill_required')['company_name']
       .nunique()
@@ -84,15 +72,12 @@ location_company_counts_dict = (
 )
 
 
-
-# Scatter data
 df_skill_avg = df.groupby('skill_required')['ctc'].mean().to_dict()
 scatter_data = [
     {'skill': row['skill_required'], 'ctc': float(row['ctc']), 'avg_ctc': float(df_skill_avg[row['skill_required']])}
     for _, row in df.iterrows()
 ]
 
-# Heatmap data
 pivot_df = df.pivot_table(values='ctc', index='skill_required', columns='location', aggfunc='mean', fill_value=0)
 heatmap_data = {
     'skills': pivot_df.index.tolist(),
@@ -100,7 +85,6 @@ heatmap_data = {
     'matrix': pivot_df.values.tolist()
 }
 
-# Stacked bar data
 crosstab_df = pd.crosstab(df['location'], df['skill_required'])
 stacked_bar_data = {
     'locations': crosstab_df.index.tolist(),
@@ -108,7 +92,6 @@ stacked_bar_data = {
     'values': crosstab_df.values.tolist()
 }
 
-# Bubble data (scatter of companies)
 ctc_min, ctc_max = df['ctc'].min(), df['ctc'].max()
 bubble_data = []
 for _, row in df.iterrows():
@@ -120,23 +103,11 @@ for _, row in df.iterrows():
         'bubble_size': size
     })
 
-###############################################################################
-# ROUTES
-###############################################################################
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-###############################################################################
-# API ENDPOINTS
-###############################################################################
-
-# @app.route('/api/1_avg_ctc_per_skill')
-# def api_avg_ctc_per_skill():
-#     items = list(skill_avg_ctc_dict.items())[:10]
-#     labels, values = zip(*items) if items else ([], [])
-#     return jsonify({'labels': list(labels), 'values': list(values)})
 @app.route('/api/1_avg_ctc_per_skill')
 def api_avg_ctc_per_skill():
     # Sort the skills by average CTC in descending order
@@ -145,49 +116,29 @@ def api_avg_ctc_per_skill():
     labels, values = zip(*top_items) if top_items else ([], [])
     return jsonify({'labels': list(labels), 'values': list(values)})
 
-
-# @app.route('/api/2_company_count_per_skill')
-# def api_company_count_per_skill():
-#     return jsonify({'labels': list(skill_counts_dict.keys()), 'values': list(skill_counts_dict.values())})
-
 @app.route('/api/2_company_count_per_skill')
 def api_company_count_per_skill():
-    # sort skills by number of distinct companies descending
     sorted_items = sorted(
         skill_company_counts_dict.items(),
         key=lambda x: x[1],
         reverse=True
     )
-    # take just the top 10
     top_items = sorted_items[1:15]
     labels, values = zip(*top_items) if top_items else ([], [])
     return jsonify({'labels': list(labels), 'values': list(values)})
 
 
-# @app.route('/api/3_company_count_per_location')
-# def api_company_count_per_location():
-#     return jsonify({'labels': list(location_counts_dict.keys()), 'values': list(location_counts_dict.values())})
-
 @app.route('/api/3_company_count_per_location')
 def api_company_count_per_location():
-    # sort by number of distinct companies, descending
     sorted_items = sorted(
         location_company_counts_dict.items(),
         key=lambda x: x[1],
         reverse=True
     )
-    # take top 10 locations
     top_items = sorted_items[:10]
     labels, values = zip(*top_items) if top_items else ([], [])
     return jsonify({'labels': list(labels), 'values': list(values)})
 
-# @app.route('/api/4_boxplot_ctc_per_skill')
-# def api_boxplot_ctc_per_skill():
-#     return jsonify(box_data_skill)
-
-# @app.route('/api/5_boxplot_ctc_per_location')
-# def api_boxplot_ctc_per_location():
-#     return jsonify(box_data_location)
 
 @app.route('/api/6_line_avg_ctc_skills')
 def api_line_avg_ctc_skills():
@@ -235,23 +186,16 @@ def api_scatter_ctc_vs_avg():
             data.append({'company': row['company_name'], 'skill': skill, 'ctc': float(row['ctc']), 'avg_ctc': float(avg_map[skill])})
     return jsonify(data)
 
-# @app.route('/api/11_heatmap_skill_location')
-# def api_heatmap_skill_location():
-#     pivot = df.pivot_table(values='ctc', index='skill_required', columns='location', aggfunc='mean', fill_value=0)
-#     top_skills = df.groupby('skill_required')['ctc'].mean().nlargest(15).index.tolist()
-#     top_locs = df['location'].value_counts().nlargest(10).index.tolist()
-#     filtered = pivot.loc[pivot.index.isin(top_skills), top_locs]
-#     return jsonify({'skills': filtered.index.tolist(), 'locations': filtered.columns.tolist(), 'matrix': filtered.values.tolist()})
+
 
 @app.route('/api/11_heatmap_skill_location')
 def api_heatmap_skill_location():
-    # Get top locations by the number of companies
-    top_locs = df['location'].value_counts().nlargest(10).index.tolist()  # Ensure this accurately reflects location count
-    # Get top skills
+    top_locs = df['location'].value_counts().nlargest(10).index.tolist()  
+
     top_skills = df.groupby('skill_required')['ctc'].mean().nlargest(15).index.tolist()
-    # Pivot for heatmap data
+
     pivot = df.pivot_table(values='ctc', index='skill_required', columns='location', aggfunc='mean', fill_value=0)
-    # Filter pivot table on top skills and top locations
+    
     filtered = pivot.loc[pivot.index.isin(top_skills), top_locs]
     
     return jsonify({
@@ -278,9 +222,6 @@ def api_bubble_company_ctc():
         data.append({'company_name': r['company_name'], 'ctc': float(r['ctc']), 'skill_required': r['skill_required'], 'bubble_size': size})
     return jsonify(data)
 
-###############################################################################
-# RUN FLASK
-###############################################################################
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
