@@ -6,10 +6,9 @@ import re
 import os
 
 app = Flask(__name__)
-# Enable CORS for all routes
+
 CORS(app)
 
-# Utility function to parse CTC strings
 def parse_ctc(ctc_str):
    
     if not isinstance(ctc_str, str):
@@ -110,7 +109,6 @@ def index():
 
 @app.route('/api/1_avg_ctc_per_skill')
 def api_avg_ctc_per_skill():
-    # Sort the skills by average CTC in descending order
     sorted_items = sorted(skill_avg_ctc_dict.items(), key=lambda x: x[1], reverse=True)
     top_items = sorted_items[:9]
     labels, values = zip(*top_items) if top_items else ([], [])
